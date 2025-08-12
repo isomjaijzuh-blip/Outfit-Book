@@ -1,113 +1,45 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Digital Outfit Book — Jaijzuh</title>
-  <link rel="stylesheet" href="./styles.css" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Jaijzuh's Digital Outfit Book</title>
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <header class="site-header">
-    <div class="brand">
-      <h1 id="siteTitle">Digital Outfit Book</h1>
-      <p class="subtitle">Organize. Browse. Love.</p>
-    </div>
-
-    <div class="controls">
-      <input id="search" type="search" placeholder="Search outfits or tags…" aria-label="Search outfits" />
-      <button id="addBtn" class="primary">+ Add Outfit</button>
-      <div class="menu">
-        <button id="exportBtn" title="Export all outfits">Export</button>
-        <button id="importOpenBtn" title="Import outfits (JSON)">Import</button>
-        <input id="importFile" type="file" accept="application/json" style="display:none" />
-        <button id="clearAllBtn" title="Clear all data">Clear</button>
-      </div>
-    </div>
+  <header>
+    <h1>Outfit Book</h1>
+    <p class="subtitle">Daily Outfits Gallery</p>
   </header>
 
-  <main class="main-area">
-    <section id="gallery" class="gallery" aria-live="polite">
-      <!-- Cards are injected here -->
+  <main>
+    <section id="gallery" class="gallery">
+      <!-- Sample outfits -->
+      <article class="outfit-card">
+        <img src="https://via.placeholder.com/300x400/FFB6C1/000000?text=Cozy+Pink+Sweater" alt="Cozy Pink Sweater" />
+        <h2>Cozy Pink Sweater</h2>
+        <p class="tags">Cozy, Casual, Fall</p>
+        <p class="notes">Perfect for chilly days with a warm drink.</p>
+      </article>
+
+      <article class="outfit-card">
+        <img src="https://via.placeholder.com/300x400/9370DB/FFFFFF?text=Purple+Evening+Dress" alt="Purple Evening Dress" />
+        <h2>Purple Evening Dress</h2>
+        <p class="tags">Elegant, Evening, Party</p>
+        <p class="notes">Great for night outs and special events.</p>
+      </article>
+
+      <article class="outfit-card">
+        <img src="https://via.placeholder.com/300x400/87CEEB/000000?text=Blue+Denim+Look" alt="Blue Denim Look" />
+        <h2>Blue Denim Look</h2>
+        <p class="tags">Casual, Everyday, Comfortable</p>
+        <p class="notes">Classic denim jacket and jeans combo.</p>
+      </article>
     </section>
-
-    <aside class="sidebar">
-      <h2>Filters</h2>
-      <div class="filter-group">
-        <label><input type="checkbox" id="showFavoritesOnly"> Favorites only</label>
-      </div>
-
-      <h3>Sort</h3>
-      <select id="sortSelect" aria-label="Sort outfits">
-        <option value="newest">Newest first</option>
-        <option value="oldest">Oldest first</option>
-        <option value="title-asc">Title A → Z</option>
-      </select>
-
-      <hr />
-
-      <div class="help">
-        <strong>Quick tips</strong>
-        <ul>
-          <li>Click a card to view details & edit.</li>
-          <li>Use Export / Import to backup or move collections.</li>
-          <li>All data stays on your device (localStorage).</li>
-        </ul>
-      </div>
-    </aside>
   </main>
 
-  <!-- Modal for adding / editing an outfit -->
-  <div id="modal" class="modal" role="dialog" aria-modal="true" aria-hidden="true">
-    <div class="modal-content">
-      <button class="close" id="modalClose" aria-label="Close">✕</button>
-
-      <form id="outfitForm">
-        <h2 id="formTitle">Add Outfit</h2>
-        <label>
-          Photo
-          <input id="photoInput" type="file" accept="image/*" />
-        </label>
-
-        <div class="image-preview" id="imagePreview" aria-hidden="true">
-          <!-- preview inserted here -->
-          <span class="empty-preview">No photo yet</span>
-        </div>
-
-        <label>
-          Title
-          <input id="titleInput" type="text" required placeholder="e.g., Summer Denim Look" />
-        </label>
-
-        <label>
-          Tags (comma separated)
-          <input id="tagsInput" type="text" placeholder="e.g., casual, blue, layered" />
-        </label>
-
-        <label>
-          Notes
-          <textarea id="notesInput" rows="3" placeholder="Details, where you wore it, brand notes..."></textarea>
-        </label>
-
-        <div class="form-actions">
-          <label class="fav-label"><input id="favInput" type="checkbox" /> Favorite</label>
-          <button type="submit" class="primary" id="saveBtn">Save</button>
-          <button type="button" id="deleteBtn" class="danger" style="display:none">Delete</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <template id="cardTemplate">
-    <article class="card" tabindex="0">
-      <div class="card-media" aria-hidden="true"></div>
-      <div class="card-body">
-        <h3 class="card-title"></h3>
-        <p class="card-tags"></p>
-      </div>
-      <button class="fav-toggle" title="Toggle favorite" aria-pressed="false">♡</button>
-    </article>
-  </template>
-
-  <script src="./script.js" defer></script>
+  <footer>
+    <p>Made for Jaijzuh | Your digital outfit book</p>
+  </footer>
 </body>
 </html>
