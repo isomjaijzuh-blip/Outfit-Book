@@ -1,0 +1,362 @@
+/* Digital Outfit Book - script.js
+   - No external libs
+   - Data stored in localStorage under key 'outfitbook:v1'
+   - Supports add/edit/delete, favorites, search, import/export JSON
+*/
+
+(() => {
+  // ---- Utilities ----
+  const qs = sel => document.querySelector(sel);
+  const qsa = sel => Array.from(document.querySelectorAll(sel));
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,8);
+
+  // ---- DOM references ----
+  const gallery = qs('#gallery');
+  const cardTemplate = qs('#cardTemplate');
+  const modal = qs('#modal');
+  const modalClose = qs('#modalClose');
+  const addBtn = qs('#addBtn');
+  const outfitForm = qs('#outfitForm');
+  const photoInput = qs('#photoInput');
+  const titleInput = qs('#titleInput');
+  const tagsInput = qs('#tagsInput');
+  const notesInput = qs('#notesInput');
+  const favInput = qs('#favInput');
+  const imagePreview = qs('#imagePreview');
+  const saveBtn = qs('#saveBtn');
+  const deleteBtn = qs('#deleteBtn');
+  const searchInput = qs('#search');
+  const exportBtn = qs('#exportBtn');
+  const importOpenBtn = qs('#importOpenBtn');
+  const importFile = qs('#importFile');
+  const clearAllBtn = qs('#clearAllBtn');
+  const showFavoritesOnly = qs('#showFavoritesOnly');
+  const sortSelect = qs('#sortSelect');
+  const siteTitle = qs('#siteTitle');
+
+  const STORAGE_KEY = 'outfitbook:v1';
+
+  // ---- State ----
+  let outfits = [];
+  let editingId = null;
+
+  // ---- Data layer ----
+  function load() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      outfits = raw ? JSON.parse(raw) : [];
+    } catch (e) {
+      outfits = [];
+      console.error('Failed to parse saved outfits', e);
+    }
+  }
+  function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(outfits));
+  }
+
+  // ---- Rendering ----
+  function createCard(item) {
+    const node = cardTemplate.content.cloneNode(true);
+    const card = node.querySelector('.card');
+    const media = node.querySelector('.card-media');
+    const title = node.querySelector('.card-title');
+    const tags = node.querySelector('.card-tags');
+    const favBtn = node.querySelector('.fav-toggle');
+
+    title.textContent = item.title || 'Untitled';
+    tags.textContent = (item.tags || []).join(', ');
+    favBtn.innerText = item.favorite ? '♥' : '♡';
+    favBtn.setAttribute('aria-pressed', item.favorite ? 'true' : 'false');
+
+    if (item.image) {
+      const img = document.createElement('img');
+      img.src = item.image;
+      img.alt = item.title || 'Outfit image';
+      media.appendChild(img);
+    } else {
+      media.innerHTML = `<svg width="90" height="90" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <rect width="24" height="24" rx="4" fill="rgba(255,255,255,0.02)"/>
+        <path d="M4 7h16M6 11l3 3 3-4 4 5" stroke="rgba(255,255,255,0.2)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>`;
+      media.style.alignItems = 'center';
+    }
+
+    // open editor/view on click
+    card.addEventListener('click', (e) => {
+      if (e.target === favBtn) return; // handled separately
+      openEditor(item.id);
+    });
+
+    // favorite toggle
+    favBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleFavorite(item.id);
+    });
+
+    return card;
+  }
+
+  function render() {
+    gallery.innerHTML = '';
+    const q = searchInput.value.trim().toLowerCase();
+    const favOnly = showFavoritesOnly.checked;
+    const sortBy = sortSelect.value;
+
+    let list = outfits.slice();
+
+    // filter
+    if (q) {
+      list = list.filter(o => {
+        const inTitle = (o.title || '').toLowerCase().includes(q);
+        const inTags = (o.tags || []).join(' ').toLowerCase().includes(q);
+        const inNotes = (o.notes || '').toLowerCase().includes(q);
+        return inTitle || inTags || inNotes;
+      });
+    }
+    if (favOnly) list = list.filter(o => o.favorite);
+
+    // sort
+    if (sortBy === 'newest') list.sort((a,b)=> b.createdAt - a.createdAt);
+    else if (sortBy === 'oldest') list.sort((a,b)=> a.createdAt - b.createdAt);
+    else if (sortBy === 'title-asc') list.sort((a,b)=> (a.title||'').localeCompare(b.title||''));
+
+    if (list.length === 0) {
+      gallery.innerHTML = `<div class="empty" style="color:var(--muted);padding:40px;border-radius:12px;background:rgba(255,255,255,0.02);text-align:center">
+        <strong>No outfits yet</strong>
+        <p style="margin:.5rem 0">Click <strong>+ Add Outfit</strong> to add your first look.</p>
+      </div>`;
+      return;
+    }
+
+    const fragment = document.createDocumentFragment();
+    list.forEach(item => fragment.appendChild(createCard(item)));
+    gallery.appendChild(fragment);
+  }
+
+  // ---- Actions ----
+  function openModal() {
+    modal.setAttribute('aria-hidden', 'false');
+    // trap focus could be added; minimal implementation:
+    setTimeout(()=> titleInput.focus(), 120);
+  }
+  function closeModal() {
+    modal.setAttribute('aria-hidden', 'true');
+    resetForm();
+  }
+  function resetForm() {
+    outfitForm.reset();
+    imagePreview.innerHTML = '<span class="empty-preview">No photo yet</span>';
+    deleteBtn.style.display = 'none';
+    editingId = null;
+    qs('#formTitle').textContent = 'Add Outfit';
+  }
+
+  function openEditor(id) {
+    const item = outfits.find(o => o.id === id);
+    if (!item) return;
+    editingId = id;
+    qs('#formTitle').textContent = 'Edit Outfit';
+    titleInput.value = item.title || '';
+    tagsInput.value = (item.tags || []).join(', ');
+    notesInput.value = item.notes || '';
+    favInput.checked = !!item.favorite;
+    if (item.image) {
+      imagePreview.innerHTML = '';
+      const img = document.createElement('img');
+      img.src = item.image;
+      img.alt = item.title || 'Outfit';
+      imagePreview.appendChild(img);
+    } else {
+      imagePreview.innerHTML = '<span class="empty-preview">No photo yet</span>';
+    }
+    deleteBtn.style.display = 'inline-block';
+    openModal();
+  }
+
+  function toggleFavorite(id) {
+    const idx = outfits.findIndex(o => o.id === id);
+    if (idx === -1) return;
+    outfits[idx].favorite = !outfits[idx].favorite;
+    save();
+    render();
+  }
+
+  function handleImageFile(file) {
+    return new Promise((res, rej) => {
+      if (!file) return res(null);
+      const reader = new FileReader();
+      reader.onload = () => res(reader.result);
+      reader.onerror = () => rej(new Error('Image read error'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function handleFormSubmit(e) {
+    e.preventDefault();
+    saveBtn.disabled = true;
+    try {
+      let imageData = null;
+      const file = photoInput.files && photoInput.files[0];
+      if (file) {
+        imageData = await handleImageFile(file);
+      } else if (editingId) {
+        // keep existing if editing and no new file chosen
+        const existing = outfits.find(o => o.id === editingId);
+        imageData = existing ? existing.image : null;
+      }
+
+      const payload = {
+        title: titleInput.value.trim() || 'Untitled',
+        tags: tagsInput.value.split(',').map(t => t.trim()).filter(Boolean),
+        notes: notesInput.value.trim(),
+        favorite: !!favInput.checked,
+        image: imageData,
+        updatedAt: Date.now()
+      };
+
+      if (editingId) {
+        const idx = outfits.findIndex(o => o.id === editingId);
+        if (idx !== -1) {
+          outfits[idx] = { ...outfits[idx], ...payload };
+        }
+      } else {
+        const item = {
+          id: uid(),
+          createdAt: Date.now(),
+          ...payload
+        };
+        outfits.push(item);
+      }
+      save();
+      render();
+      closeModal();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to save outfit. See console for details.');
+    } finally {
+      saveBtn.disabled = false;
+    }
+  }
+
+  function handleDelete() {
+    if (!editingId) return;
+    if (!confirm('Delete this outfit? This action cannot be undone.')) return;
+    outfits = outfits.filter(o => o.id !== editingId);
+    save();
+    render();
+    closeModal();
+  }
+
+  function handleExport() {
+    const blob = new Blob([JSON.stringify(outfits, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `outfitbook_export_${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function handleImportFileChosen(evt) {
+    const f = evt.target.files && evt.target.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result);
+        if (!Array.isArray(parsed)) throw new Error('Invalid format - expected array');
+        // merge: avoid id collisions by keeping imported ids but if duplicates, rename
+        const existingIds = new Set(outfits.map(o=>o.id));
+        const normalized = parsed.map(item => {
+          if (!item.id || existingIds.has(item.id)) item.id = uid();
+          // keep createdAt if present else set to now
+          if (!item.createdAt) item.createdAt = Date.now();
+          return item;
+        });
+        outfits = outfits.concat(normalized);
+        save();
+        render();
+        alert(`Imported ${normalized.length} outfits.`);
+      } catch (e) {
+        console.error(e);
+        alert('Failed to import file: invalid JSON or format.');
+      }
+    };
+    reader.readAsText(f);
+    // reset input value so same file can be chosen again later
+    importFile.value = '';
+  }
+
+  function handleClearAll() {
+    if (!confirm('Clear all outfits from local storage? This cannot be undone.')) return;
+    outfits = [];
+    save();
+    render();
+  }
+
+  // ---- Event wiring ----
+  addBtn.addEventListener('click', () => {
+    resetForm();
+    openModal();
+  });
+  modalClose.addEventListener('click', closeModal);
+  modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+  outfitForm.addEventListener('submit', handleFormSubmit);
+  deleteBtn.addEventListener('click', handleDelete);
+
+  photoInput.addEventListener('change', async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) {
+      imagePreview.innerHTML = '<span class="empty-preview">No photo yet</span>';
+      return;
+    }
+    try {
+      const data = await handleImageFile(file);
+      imagePreview.innerHTML = '';
+      const img = document.createElement('img');
+      img.src = data;
+      img.alt = titleInput.value || 'Outfit';
+      imagePreview.appendChild(img);
+    } catch (err) {
+      console.error(err);
+      imagePreview.innerHTML = '<span class="empty-preview">Could not preview</span>';
+    }
+  });
+
+  searchInput.addEventListener('input', () => render());
+  showFavoritesOnly.addEventListener('change', () => render());
+  sortSelect.addEventListener('change', () => render());
+  exportBtn.addEventListener('click', handleExport);
+
+  importOpenBtn.addEventListener('click', () => importFile.click());
+  importFile.addEventListener('change', handleImportFileChosen);
+
+  clearAllBtn.addEventListener('click', handleClearAll);
+
+  // Keyboard shortcut: N = new outfit
+  window.addEventListener('keydown', (e) => {
+    if (e.key.toLowerCase() === 'n' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      resetForm();
+      openModal();
+    }
+  });
+
+  // ---- Boot ----
+  (function init() {
+    load();
+    // Friendly personalization if local name exists in filename or title — keep it subtle:
+    // nothing else requested, but replace branding with saved name if present in localStorage meta
+    const metaName = localStorage.getItem('outfitbook:ownerName');
+    if (metaName) siteTitle.textContent = `${metaName}'s Outfit Book`;
+    render();
+  })();
+
+  // Expose minimal debug for console
+  window.__OutfitBook = {
+    getAll: () => outfits,
+    saveAll: (arr) => { outfits = arr; save(); render(); }
+  };
+})();
